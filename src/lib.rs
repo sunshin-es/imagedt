@@ -2,7 +2,10 @@ use std::fs::File;
 use std::io::BufReader;
 use std::time::UNIX_EPOCH;
 
+use exif::In;
 use exif::Reader;
+
+use chrono::NaiveDateTime;
 
 const EXIF_DATE_TIME_ORIGINAL: u8 = 1;
 const EXIF_CREATE_DATE: u8 = 2;
@@ -11,10 +14,6 @@ const EXIF_MODIFY_DATE: u8 = 3;
 const SYS_CREATED: u8 = 4;
 const SYS_MODIFIED: u8 = 5;
 const SYS_ACCESSED: u8 = 6;
-
-// 0x9010  OffsetTime  string  ExifIFD (time zone for ModifyDate)
-// 0x9011  OffsetTimeOriginal  string  ExifIFD (time zone for DateTimeOriginal)
-// 0x9012  OffsetTimeDigitized string  ExifIFD (time zone for CreateDate)
 
 fn get_image_date(filename: &str) -> Result<u64, String> {
     // the first step is to see if we can even open the file...
@@ -38,8 +37,9 @@ fn get_image_date(filename: &str) -> Result<u64, String> {
         dates.sort_by(|a, b| a.0.cmp(&b.0));
         Ok(dates[0].1)
     } else {
-        // literally nothing worked, so here is the fallback
-        Ok(6)
+        // literally nothing worked, so here is the fallback - a date in the future so this will be
+        // noticed
+        Ok(1936268400)
     }
 }
 
@@ -48,6 +48,51 @@ fn get_exif_image_dates(file: &File, dates: &mut Vec<(u8, u64)>) {
         Ok(exif) => exif,
         Err(_) => return, // Could not create the exif reader, so there is nothing more to do here
     };
+
+    // 0x9003 DateTimeOriginal   (date/time when original image was taken)
+    // 0x9011 OffsetTimeOriginal (time zone for DateTimeOriginal)
+    if let Ok(t) = get_exif_date(
+        &exif,
+        exif::Tag::DateTimeOriginal,
+        exif::Tag::OffsetTimeOriginal,
+    ) {
+        // we are going in order of priority, so if this worked there is no need to proceed any
+        // further
+        dates.push((EXIF_DATE_TIME_ORIGINAL, t));
+        return;
+    }
+
+    // 0x9004 CreateDate          (called DateTimeDigitized by the EXIF spec.)
+    // 0x9012 OffsetTimeDigitized (time zone for CreateDate)
+    if let Ok(t) = get_exif_date(&exif, exif::Tag::DateTime, exif::Tag::OffsetTime) {
+        dates.push((EXIF_CREATE_DATE, t));
+        return;
+    }
+
+    // 0x0132 ModifyDate (called DateTime by the EXIF spec.)
+    // 0x9010 OffsetTime (time zone for ModifyDate)
+    if let Ok(t) = get_exif_date(&exif, exif::Tag::DateTime, exif::Tag::OffsetTime) {
+        dates.push((EXIF_MODIFY_DATE, t));
+    }
+}
+
+fn get_exif_date(exif: &exif::Exif, date: exif::Tag, timezone: exif::Tag) -> Result<u64, String> {
+    // TODO: Check for In::THUMBNAIL as well
+    let date_field = match exif.get_field(date, In::PRIMARY) {
+        Some(date) => date,
+        _ => return Err("Failed to extract exif field".to_string()),
+    };
+
+    let date_string = format!("{}", date_field.value.display_as(date));
+    let no_timezone = match NaiveDateTime::parse_from_str(&date_string, "%Y-%m-%d %H:%M:%S") {
+        Ok(time) => time,
+        _ => return Err("Failed to match date format extracted from exif data".to_string()),
+    };
+
+    // We will force this to UTC time since we do not use the exact time and then
+    // we can have matching types.
+    // TODO: How to use supplied timezone information?
+    Ok(no_timezone.timestamp() as u64)
 }
 
 fn get_filesystem_dates(file: &File, dates: &mut Vec<(u8, u64)>) {
