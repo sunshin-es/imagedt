@@ -25,8 +25,12 @@ fn get_image_date(filename: &str) -> Result<u64, String> {
 
     // now create a vector to hold all of the dates we hope we can find
     let mut dates: Vec<(u8, u64)> = Vec::new();
-    get_filesystem_dates(&file, &mut dates);
     get_exif_image_dates(&file, &mut dates);
+    if dates.len() == 0 {
+        // exif data has a higher priority, so we do not need to try here unless we could not
+        // extract any exif data
+        get_filesystem_dates(&file, &mut dates);
+    }
 
     // sort the vector so we can return the first (and highest priority)
     if dates.len() > 0 {
@@ -61,6 +65,9 @@ fn get_filesystem_dates(file: &File, dates: &mut Vec<(u8, u64)>) {
             .expect("Time is running backwards");
         let since_epoch = since_epoch.as_secs(); // we can ignore the nano second portion
         dates.push((SYS_CREATED, since_epoch));
+        // we are going in order of priority, so if this worked there is no need to proceed any
+        // further
+        return;
     }
 
     // The returned value corresponds to the mtime field of stat on Unix platforms and the
@@ -71,6 +78,7 @@ fn get_filesystem_dates(file: &File, dates: &mut Vec<(u8, u64)>) {
             .expect("Time is running backwards");
         let since_epoch = since_epoch.as_secs(); // we can ignore the nano second portion
         dates.push((SYS_MODIFIED, since_epoch));
+        return;
     }
 
     // The returned value corresponds to the atime field of stat on Unix platforms and the
