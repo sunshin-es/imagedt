@@ -147,6 +147,11 @@ fn get_filesystem_dates(file: &File, dates: &mut Vec<(u8, u64)>) {
 mod tests {
     use super::*;
 
+    use std::path::Path;
+    use std::time::Instant;
+
+    use walkdir::WalkDir;
+
     #[test]
     fn date_time_original() {
         // image: Canon_40D.jpg
@@ -170,5 +175,77 @@ mod tests {
         } else {
             panic!("Result was not Ok!");
         }
+    }
+
+    fn is_file_image(filename: &str) -> bool {
+        let ext = Path::new(filename).extension();
+        let ext = match ext {
+            Some(ext) => ext,
+            _ => return false, // the file has no extension
+        };
+
+        let ext = match ext.to_str() {
+            Some(ext) => ext,
+            _ => return false, // non utf-8 filename, don't know what else to do
+        };
+
+        match ext.to_lowercase().as_ref() {
+            "jpg" => return true,
+            "jpeg" => return true,
+            "tiff" => return true,
+            "tif" => return true,
+            "gif" => return true,
+            "png" => return true,
+            "bmp" => return true,
+            "cr2" => return true,
+            _ => return false, // extension does not match anything above
+        }
+    }
+
+    #[test]
+    // To see the time result of this function you have to run cargo test as such:
+    // cargo test -- --nocapture
+    fn image_search() {
+        let directory = "c:\\projects\\exif-samples";
+        let target = Path::new(&directory);
+        let mut count = 0;
+
+        if target.exists() == false || target.is_dir() == false {
+            panic!("The specified directory does not exist, or is not an actual directory");
+        } // else - no error so we can continue ...
+
+        let start = Instant::now();
+        for entry in WalkDir::new(&directory)
+            .follow_links(true)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            if entry.file_type().is_file() {
+                let filename = entry.path(); // path is the absolute path
+
+                // TODO: we only need this because is_file_image accepts only &str, it would be better
+                // to also accept Some(&str)
+                let filename = match filename.to_str() {
+                    Some(filename) => filename,
+                    _ => {
+                        panic!(format!(
+                            "Unable to convert {} to string.",
+                            filename.display()
+                        ))
+                    }
+                };
+
+                if is_file_image(filename) {
+                    if let Ok(_) = get_image_date(&filename) {
+                        assert!(true);
+                        count += 1;
+                    } else {
+                        panic!("Result was not Ok!");
+                    }
+                } // else - not an image so ignore it
+            } // else - not a file so ignore it
+        }
+        let duration = start.elapsed();
+        println!("Processed {} images in {:?}", count, duration);
     }
 }
