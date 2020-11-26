@@ -15,7 +15,7 @@ const SYS_CREATED: u8 = 4;
 const SYS_MODIFIED: u8 = 5;
 const SYS_ACCESSED: u8 = 6;
 
-fn get_image_date(filename: &str) -> Result<u64, String> {
+pub fn get_image_date(filename: &str) -> Result<u64, String> {
     // the first step is to see if we can even open the file...
     let file = match File::open(&filename) {
         Ok(file) => file,
@@ -76,7 +76,7 @@ fn get_exif_image_dates(file: &File, dates: &mut Vec<(u8, u64)>) {
     }
 }
 
-fn get_exif_date(exif: &exif::Exif, date: exif::Tag, timezone: exif::Tag) -> Result<u64, String> {
+fn get_exif_date(exif: &exif::Exif, date: exif::Tag, _timezone: exif::Tag) -> Result<u64, String> {
     // TODO: Check for In::THUMBNAIL as well
     let date_field = match exif.get_field(date, In::PRIMARY) {
         Some(date) => date,
@@ -206,7 +206,7 @@ mod tests {
     // To see the time result of this function you have to run cargo test as such:
     // cargo test -- --nocapture
     fn image_search() {
-        let directory = "c:\\projects\\exif-samples";
+        let directory = "d:\\pictures";
         let target = Path::new(&directory);
         let mut count = 0;
 
