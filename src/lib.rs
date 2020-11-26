@@ -141,10 +141,34 @@ fn get_filesystem_dates(file: &File, dates: &mut Vec<(u8, u64)>) {
     }
 }
 
+// Using https://github.com/ianare/exif-samples
+// for example images
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn date_time_original() {
+        // image: Canon_40D.jpg
+        // DateTimeOriginal - 2008:05:30 15:56:01 (from Irfanview)
+        // https://www.unixtimestamp.com
+        if let Ok(time) = get_image_date("c:\\projects\\exif-samples\\jpg\\Canon_40D.jpg") {
+            assert_eq!(time, 1212162961);
+        } else {
+            panic!("Result was not Ok!");
+        }
+    }
+
+    #[test]
+    fn sys_created() {
+        // image: image01137.jpg
+        // Created - Thursday, November 26, 2020, 9:58:09 AM (from Windows [exif is invalid])
+        // https://www.unixtimestamp.com
+        if let Ok(time) = get_image_date("c:\\projects\\exif-samples\\jpg\\invalid\\image01137.jpg")
+        {
+            assert_eq!(time, 1606381089);
+        } else {
+            panic!("Result was not Ok!");
+        }
     }
 }
