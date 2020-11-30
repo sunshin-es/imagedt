@@ -28,11 +28,13 @@ const SYS_CREATED: u8 = 4;
 const SYS_MODIFIED: u8 = 5;
 const SYS_ACCESSED: u8 = 6;
 
-pub fn get_image_date(filename: &str) -> Result<u64, String> {
+const ERR_DATE: u64 = 1936268400;
+
+pub fn get_image_date(filename: &str) -> u64 {
     // the first step is to see if we can even open the file...
     let file = match File::open(&filename) {
         Ok(file) => file,
-        Err(_) => return Err(format!("Failed to open file: {}", filename).to_string()),
+        Err(_) => return ERR_DATE,
     };
 
     // now create a vector to hold all of the dates we hope we can find
@@ -48,11 +50,11 @@ pub fn get_image_date(filename: &str) -> Result<u64, String> {
     if dates.len() > 0 {
         // sort the vector by the first element in each tuple, i.e. the priority
         dates.sort_by(|a, b| a.0.cmp(&b.0));
-        Ok(dates[0].1)
+        dates[0].1
     } else {
         // literally nothing worked, so here is the fallback - a date in the future so this will be
         // noticed
-        Ok(1936268400)
+        ERR_DATE
     }
 }
 
@@ -170,11 +172,8 @@ mod tests {
         // image: Canon_40D.jpg
         // DateTimeOriginal - 2008:05:30 15:56:01 (from Irfanview)
         // https://www.unixtimestamp.com
-        if let Ok(time) = get_image_date("c:\\projects\\exif-samples\\jpg\\Canon_40D.jpg") {
-            assert_eq!(time, 1212162961);
-        } else {
-            panic!("Result was not Ok!");
-        }
+        let time = get_image_date("c:\\projects\\exif-samples\\jpg\\Canon_40D.jpg");
+        assert_eq!(time, 1212162961);
     }
 
     #[test]
@@ -182,12 +181,8 @@ mod tests {
         // image: image01137.jpg
         // Created - Thursday, November 26, 2020, 9:58:09 AM (from Windows [exif is invalid])
         // https://www.unixtimestamp.com
-        if let Ok(time) = get_image_date("c:\\projects\\exif-samples\\jpg\\invalid\\image01137.jpg")
-        {
-            assert_eq!(time, 1606381089);
-        } else {
-            panic!("Result was not Ok!");
-        }
+        let time = get_image_date("c:\\projects\\exif-samples\\jpg\\invalid\\image01137.jpg");
+        assert_eq!(time, 1606381089);
     }
 
     fn is_file_image(filename: &str) -> bool {
@@ -249,12 +244,9 @@ mod tests {
                 };
 
                 if is_file_image(filename) {
-                    if let Ok(_) = get_image_date(&filename) {
-                        assert!(true);
-                        count += 1;
-                    } else {
-                        panic!("Result was not Ok!");
-                    }
+                    let _time = get_image_date(&filename);
+                    assert!(true);
+                    count += 1;
                 } // else - not an image so ignore it
             } // else - not a file so ignore it
         }

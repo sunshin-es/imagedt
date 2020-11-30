@@ -8,7 +8,9 @@ available then the filesystem times are used. The overall priority is therefore:
 4. System Created
 5. System Modified
 6. System Accessed
+7. If none of the above worked, or an error is encountered, then a future time is returned.
 
+This library will always return a u64 for the time.
 ## Usage
 
 Add a dependency to Cargo.toml.
@@ -19,4 +21,6 @@ imagedt = { git = "https://github.com/sunshin-es/imagedt" }
 ```
 ## Dependencies
 
+kamadak-exif
+chrono
 Rust 1.40 or later is required to build.
